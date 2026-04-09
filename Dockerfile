@@ -1,0 +1,54 @@
+FROM node:20-alpine AS base
+
+# ─── Dependencies ─────────────────────────────────────
+FROM base AS deps
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
+COPY package.json ./
+RUN npm install --legacy-peer-deps
+
+# ─── Build ────────────────────────────────────────────
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+# Build args for env vars at build time
+ARG META_ACCESS_TOKEN
+ARG META_AD_ACCOUNT_ID
+ARG GA4_PROPERTY_ID
+ARG SHOPIFY_STORE
+ARG SHOPIFY_ACCESS_TOKEN
+ARG SUPABASE_URL
+ARG SUPABASE_SERVICE_ROLE_KEY
+ARG SENDCLOUD_API_KEY
+ARG SENDCLOUD_API_SECRET
+ARG ANTHROPIC_API_KEY
+ARG REPLICATE_API_TOKEN
+ARG RESEND_API_KEY
+ARG APPROVAL_EMAIL
+ARG CRON_SECRET
+
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN npm run build
+
+# ─── Runner ───────────────────────────────────────────
+FROM base AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV PORT=8080
+
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
+
+COPY --from=builder /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder /app/ga4-credentials.json ./ga4-credentials.json
+
+USER nextjs
+
+EXPOSE 8080
+
+CMD ["node", "server.js"]
