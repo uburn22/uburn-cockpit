@@ -3,13 +3,27 @@ import { format } from "date-fns";
 import type { TrafficSource, DailySessions, GA4Data, DateRange } from "../types";
 
 const PROPERTY_ID = process.env.GA4_PROPERTY_ID!;
-const CREDENTIALS_PATH = process.env.GA4_CREDENTIALS_PATH!;
 
 async function getAnalyticsClient() {
-  const auth = new google.auth.GoogleAuth({
-    keyFile: CREDENTIALS_PATH,
-    scopes: ["https://www.googleapis.com/auth/analytics.readonly"],
-  });
+  // Support both: file path (local dev) or JSON string (Vercel env var)
+  const credentialsPath = process.env.GA4_CREDENTIALS_PATH;
+  const credentialsJson = process.env.GA4_CREDENTIALS_JSON;
+
+  let auth;
+  if (credentialsJson) {
+    const credentials = JSON.parse(credentialsJson);
+    auth = new google.auth.GoogleAuth({
+      credentials,
+      scopes: ["https://www.googleapis.com/auth/analytics.readonly"],
+    });
+  } else if (credentialsPath) {
+    auth = new google.auth.GoogleAuth({
+      keyFile: credentialsPath,
+      scopes: ["https://www.googleapis.com/auth/analytics.readonly"],
+    });
+  } else {
+    throw new Error("GA4 credentials not configured");
+  }
   return google.analyticsdata({ version: "v1beta", auth });
 }
 

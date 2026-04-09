@@ -10,6 +10,7 @@ import {
   Zap,
   Bot,
   MessageCircle,
+  Layers,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -19,6 +20,7 @@ const NAV_ITEMS = [
   { href: "/audience", label: "Audience", icon: Users },
   { href: "/logistics", label: "Logistics", icon: Truck },
   { href: "/signals", label: "Signals", icon: Zap },
+  { href: "/content", label: "Content", icon: Layers },
   { href: "/agents", label: "Agents", icon: Bot },
   { href: "/chat", label: "Chat IA", icon: MessageCircle },
 ];

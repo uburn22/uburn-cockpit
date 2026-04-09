@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getRealGA4Data } from "@/services/api/ga4";
 import { getMockGA4Data } from "@/services/mock/ga4";
 
-const USE_REAL_API = !!process.env.GA4_PROPERTY_ID && !!process.env.GA4_CREDENTIALS_PATH;
+const USE_REAL_API = !!process.env.GA4_PROPERTY_ID && !!(process.env.GA4_CREDENTIALS_PATH || process.env.GA4_CREDENTIALS_JSON);
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
