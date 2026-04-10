@@ -196,6 +196,14 @@ export default function CockpitV3() {
 
   // Fetch live data on mount
   useEffect(() => {
+    // Build a 30-day date range for APIs that require from/to
+    const now = new Date();
+    const toStr = now.toISOString().slice(0, 10);
+    const fromDate = new Date(now);
+    fromDate.setDate(fromDate.getDate() - 30);
+    const fromStr = fromDate.toISOString().slice(0, 10);
+    const range = `?from=${fromStr}&to=${toStr}`;
+
     // Fetch content
     fetch("/api/content/library").then(r => r.json()).then(data => {
       if (data.items) setContentItems(data.items);
@@ -204,10 +212,14 @@ export default function CockpitV3() {
     // Fetch agent logs for live feed
     fetch("/api/agents/logs").then(r => r.json()).then(data => {
       if (Array.isArray(data)) {
-        const logs: LiveLog[] = data.slice(0, 12).map((log: { created_at: string; agent_name: string; action: string; status: string }) => {
-          const d = new Date(log.created_at);
+        const logs: LiveLog[] = data.slice(0, 12).map((log: { timestamp?: string; created_at?: string; agent_name: string; action: string; status: string }) => {
+          const raw = log.timestamp || log.created_at;
+          const d = raw ? new Date(raw) : null;
+          const time = d && !isNaN(d.getTime())
+            ? `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`
+            : "--:--";
           return {
-            time: `${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`,
+            time,
             agent: log.agent_name,
             msg: log.action,
             type: log.status === "success" ? "success" : log.status === "error" ? "error" : "warning",
@@ -217,11 +229,11 @@ export default function CockpitV3() {
       }
     }).catch(() => {});
 
-    // Fetch KPIs for agents
+    // Fetch KPIs for agents — ALL routes require from/to params
     Promise.all([
-      fetch("/api/meta-ads").then(r => r.json()).catch(() => null),
-      fetch("/api/shopify").then(r => r.json()).catch(() => null),
-      fetch("/api/ga4").then(r => r.json()).catch(() => null),
+      fetch(`/api/meta-ads${range}`).then(r => r.json()).catch(() => null),
+      fetch(`/api/shopify${range}`).then(r => r.json()).catch(() => null),
+      fetch(`/api/ga4${range}`).then(r => r.json()).catch(() => null),
     ]).then(([meta, shopify, ga4]) => {
       setAgentData(prev => prev.map(a => {
         if (a.id === "meta-ads" && meta && !meta.error) {
@@ -239,11 +251,14 @@ export default function CockpitV3() {
           ], lastAction: `${shopify.totalOrders || 0} commandes — AOV ${(shopify.aov || 0).toFixed(0)}€`, lastTime: "live" };
         }
         if (a.id === "ga4" && ga4 && !ga4.error) {
+          const newUsers = ga4.newVsReturning?.new || 0;
+          const returningUsers = ga4.newVsReturning?.returning || 0;
+          const totalUsers = newUsers + returningUsers;
           return { ...a, kpis: [
             { l: "Sessions", v: `${ga4.totalSessions || 0}`, c: WHITE },
-            { l: "Utilisateurs", v: `${ga4.totalUsers || 0}`, c: GREEN },
-            { l: "New", v: `${ga4.newUsers || 0}`, c: ORANGE },
-          ], lastAction: `${ga4.totalSessions || 0} sessions — ${ga4.totalUsers || 0} utilisateurs`, lastTime: "live" };
+            { l: "Utilisateurs", v: `${totalUsers}`, c: GREEN },
+            { l: "New", v: `${newUsers}`, c: ORANGE },
+          ], lastAction: `${ga4.totalSessions || 0} sessions — ${totalUsers} utilisateurs`, lastTime: "live" };
         }
         return a;
       }));
