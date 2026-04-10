@@ -13,7 +13,7 @@
  */
 
 const NOTIFY_EMAIL = process.env.APPROVAL_EMAIL || "hello@uburn.co";
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3001";
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3001");
 
 // ── Types ───────────────────────────────────────────────
 interface ApprovalRequest {

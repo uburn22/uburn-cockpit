@@ -14,7 +14,7 @@
 import { format, subDays } from "date-fns";
 import { fr } from "date-fns/locale";
 
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3001";
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3001");
 const NAPKIN_API_KEY = process.env.NAPKIN_API_KEY || "";
 
 // ── Napkin AI API Client ────────────────────────────────

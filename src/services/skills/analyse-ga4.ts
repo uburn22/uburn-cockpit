@@ -1,7 +1,7 @@
 import { format, subDays } from "date-fns";
 import { fr } from "date-fns/locale";
 
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3001";
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3001");
 
 async function fetchAPI(path: string, from: string, to: string): Promise<Record<string, unknown>> {
   const res = await fetch(`${BASE_URL}${path}?from=${from}&to=${to}`, { cache: "no-store" });

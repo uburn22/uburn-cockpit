@@ -2,7 +2,7 @@ import { format, subDays } from "date-fns";
 import { fr } from "date-fns/locale";
 import { logAction, getConfig, updateLastRun } from "./base";
 
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3001";
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3001");
 
 async function fetchAPI(path: string): Promise<Record<string, unknown>> {
   const now = new Date();

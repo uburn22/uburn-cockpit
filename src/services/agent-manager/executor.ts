@@ -29,7 +29,7 @@ import {
 import { logAction } from "@/services/agents/base";
 import { getSupabase } from "@/lib/supabase";
 
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3001";
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3001");
 
 // ── Save generated content to content_library ─────────────
 async function saveToLibrary(items: Array<{

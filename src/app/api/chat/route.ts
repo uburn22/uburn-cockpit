@@ -12,7 +12,10 @@ const anthropic = new Anthropic({
 });
 
 // ── Helpers to fetch internal data ─────────────────────
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3001";
+// Priority: explicit NEXT_PUBLIC_BASE_URL → Vercel auto-detected URL → localhost
+const BASE_URL =
+  process.env.NEXT_PUBLIC_BASE_URL ||
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3001");
 
 async function fetchInternal(path: string, days = 30): Promise<unknown> {
   const now = new Date();

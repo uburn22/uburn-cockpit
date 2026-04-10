@@ -1,7 +1,7 @@
 import { logAction, getConfig, updateLastRun } from "./base";
 import { format, subDays } from "date-fns";
 
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3001";
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3001");
 
 interface GA4Data {
   totalSessions: number;
