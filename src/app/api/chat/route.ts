@@ -1,73 +1,61 @@
 import { NextRequest, NextResponse } from "next/server";
 import { format, subDays } from "date-fns";
 import { fr } from "date-fns/locale";
-import { getRecentLogs, getAllConfigs } from "@/services/agents/base";
 import Anthropic from "@anthropic-ai/sdk";
 import { AGENT_TOOLS } from "@/services/agent-manager/tools";
 import { executeTool, clearSessionResults } from "@/services/agent-manager/executor";
+import type { DateRange, ShopifyData, MetaAdsData, GA4Data, SendcloudData } from "@/services/types";
+import { getMockShopifyData } from "@/services/mock/shopify";
+import { getMockMetaAdsData } from "@/services/mock/meta-ads";
+import { getMockGA4Data } from "@/services/mock/ga4";
+import { getMockSendcloudData } from "@/services/mock/sendcloud";
+import { getRealShopifyData } from "@/services/api/shopify";
+import { getRealMetaAdsData } from "@/services/api/meta-ads";
+import { getRealGA4Data } from "@/services/api/ga4";
+import { getRealSendcloudData } from "@/services/api/sendcloud";
 
 // ── Anthropic client ────────────────────────────────────
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || "",
 });
 
-// ── Helpers to fetch internal data ─────────────────────
-// Priority: explicit NEXT_PUBLIC_BASE_URL → Vercel auto-detected URL → localhost
-const BASE_URL =
-  process.env.NEXT_PUBLIC_BASE_URL ||
-  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3001");
-
-async function fetchInternal(path: string, days = 30): Promise<unknown> {
-  const now = new Date();
-  const from = format(subDays(now, days), "yyyy-MM-dd");
-  const to = format(now, "yyyy-MM-dd");
-  const url = `${BASE_URL}${path}?from=${from}&to=${to}`;
-  try {
-    const res = await fetch(url, { cache: "no-store" });
-    if (!res.ok) return { error: `API ${path} returned ${res.status}` };
-    return res.json();
-  } catch (e) {
-    return { error: `Failed to fetch ${path}: ${e}` };
-  }
-}
-
-// ── Gather all live data for context ────────────────────
+// ── Gather business context DIRECTLY (no HTTP self-fetch) ────
+// Calls service functions in-process — way faster than fetch("/api/...")
 async function gatherBusinessContext(): Promise<string> {
-  const [shopify, metaAds, sendcloud, ga4, agentConfigs, agentLogs] =
-    await Promise.all([
-      fetchInternal("/api/shopify"),
-      fetchInternal("/api/meta-ads"),
-      fetchInternal("/api/sendcloud"),
-      fetchInternal("/api/ga4"),
-      getAllConfigs().catch(() => []),
-      getRecentLogs(20).catch(() => []),
-    ]);
+  const now = new Date();
+  const range: DateRange = { from: subDays(now, 30), to: now };
+
+  const safeCall = async <T>(real: () => Promise<T>, mock: () => T): Promise<T> => {
+    try {
+      return await real();
+    } catch {
+      return mock();
+    }
+  };
+
+  const useRealShopify = !!process.env.SHOPIFY_ACCESS_TOKEN && !!process.env.SHOPIFY_STORE;
+  const useRealMeta = !!process.env.META_ACCESS_TOKEN && !!process.env.META_AD_ACCOUNT_ID;
+  const useRealGa4 = !!process.env.GA4_PROPERTY_ID && (!!process.env.GA4_CREDENTIALS_JSON || !!process.env.GA4_CREDENTIALS_PATH);
+  const useRealSendcloud = !!process.env.SENDCLOUD_API_KEY && !!process.env.SENDCLOUD_API_SECRET;
+
+  const [shopify, metaAds, ga4, sendcloud] = await Promise.all([
+    useRealShopify ? safeCall<ShopifyData>(() => getRealShopifyData(range), () => getMockShopifyData(range)) : Promise.resolve(getMockShopifyData(range)),
+    useRealMeta ? safeCall<MetaAdsData>(() => getRealMetaAdsData(range), () => getMockMetaAdsData(range)) : Promise.resolve(getMockMetaAdsData(range)),
+    useRealGa4 ? safeCall<GA4Data>(() => getRealGA4Data(range), () => getMockGA4Data(range)) : Promise.resolve(getMockGA4Data(range)),
+    useRealSendcloud ? safeCall<SendcloudData>(() => getRealSendcloudData(range), () => getMockSendcloudData(range)) : Promise.resolve(getMockSendcloudData(range)),
+  ]);
 
   const today = format(new Date(), "EEEE d MMMM yyyy", { locale: fr });
 
+  // Summarise instead of dumping full JSON — much smaller prompt, same info
   return `
-═══ DONNÉES BUSINESS UBURN EN TEMPS RÉEL ═══
-Date : ${today}
-Objectif principal : atteindre 100 commandes/jour
+═══ DONNÉES BUSINESS UBURN (30j, ${today}) ═══
+Objectif : 100 commandes/jour
 
-── SHOPIFY (30 derniers jours) ──
-${JSON.stringify(shopify, null, 2)}
-
-── META ADS (30 derniers jours) ──
-${JSON.stringify(metaAds, null, 2)}
-
-── SENDCLOUD / LOGISTIQUE (30 derniers jours) ──
-${JSON.stringify(sendcloud, null, 2)}
-
-── GA4 / ANALYTICS (30 derniers jours) ──
-${JSON.stringify(ga4, null, 2)}
-
-── AGENTS IA (configuration) ──
-${JSON.stringify(agentConfigs, null, 2)}
-
-── LOGS AGENTS (20 derniers) ──
-${JSON.stringify(agentLogs, null, 2)}
-═══════════════════════════════════════════
+SHOPIFY — CA ${shopify.totalRevenue?.toFixed(0) || 0}€, ${shopify.totalOrders || 0} commandes, AOV ${shopify.aov?.toFixed(0) || 0}€, ${shopify.ordersToday || 0} cmd aujourd'hui
+META ADS — dépense ${metaAds.totalSpend?.toFixed(0) || 0}€, ROAS ${metaAds.blendedRoas?.toFixed(1) || 0}x, CPO ${metaAds.averageCpo?.toFixed(0) || 0}€, CTR ${metaAds.averageCtr?.toFixed(2) || 0}%, ${metaAds.creatives?.length || 0} créatives actives
+GA4 — ${ga4.totalSessions || 0} sessions, ${ga4.newVsReturning?.new || 0} new / ${ga4.newVsReturning?.returning || 0} returning, top source: ${ga4.sources?.[0]?.source || "n/a"}
+SENDCLOUD — ${sendcloud.totalShipped || 0} envoyés, ${sendcloud.totalDelivered || 0} livrés (${(sendcloud.deliveryRate * 100)?.toFixed(0) || 0}%), délai moyen ${sendcloud.avgDeliveryDays?.toFixed(1) || 0}j
 `.trim();
 }
 
@@ -211,14 +199,15 @@ export async function POST(req: NextRequest) {
     const currentMessages = [...messages];
     let finalText = "";
     let iterations = 0;
-    const MAX_ITERATIONS = 8; // Safety limit
+    const MAX_ITERATIONS = 4; // Kept tight so we fit in Vercel 60s function timeout
 
     while (iterations < MAX_ITERATIONS) {
       iterations++;
 
       const response = await anthropic.messages.create({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 4096,
+        // Haiku is 3-5x faster than Sonnet — critical for 60s Vercel limit
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 2048,
         system: SYSTEM_PROMPT,
         tools: AGENT_TOOLS,
         messages: currentMessages,
