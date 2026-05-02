@@ -75,7 +75,7 @@ const ORDERS_QUERY = `
           }
           customer {
             id
-            ordersCount
+            numberOfOrders
           }
         }
       }
@@ -98,7 +98,7 @@ interface GqlOrderNode {
       };
     }[];
   };
-  customer: { id: string; ordersCount: number } | null;
+  customer: { id: string; numberOfOrders: number } | null;
 }
 
 interface OrdersResponse {
@@ -160,7 +160,7 @@ export async function getRealShopifyData(range: DateRange): Promise<ShopifyData>
     const date = format(new Date(raw.createdAt), "yyyy-MM-dd");
     const revenue = parseFloat(raw.totalPriceSet.shopMoney.amount);
     const customerId = raw.customer?.id || `unknown_${raw.id}`;
-    const isRepeat = raw.customer ? raw.customer.ordersCount > 1 : seenCustomers.has(customerId);
+    const isRepeat = raw.customer ? raw.customer.numberOfOrders > 1 : seenCustomers.has(customerId);
     seenCustomers.add(customerId);
 
     // First line item determines product (most orders are single-product)

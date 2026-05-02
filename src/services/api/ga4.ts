@@ -5,9 +5,10 @@ import type { TrafficSource, DailySessions, GA4Data, DateRange } from "../types"
 const PROPERTY_ID = process.env.GA4_PROPERTY_ID!;
 
 async function getAnalyticsClient() {
-  // Support both: file path (local dev) or JSON string (Vercel env var)
+  // Support: file path (local dev), legacy JSON env, or modern GA4_SERVICE_ACCOUNT_JSON (Doppler/Cloud Run)
   const credentialsPath = process.env.GA4_CREDENTIALS_PATH;
-  const credentialsJson = process.env.GA4_CREDENTIALS_JSON;
+  const credentialsJson =
+    process.env.GA4_CREDENTIALS_JSON || process.env.GA4_SERVICE_ACCOUNT_JSON;
 
   let auth;
   if (credentialsJson) {
