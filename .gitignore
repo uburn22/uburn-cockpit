@@ -40,3 +40,8 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .env
+
+# Service account credentials — NEVER commit (use Doppler GA4_SERVICE_ACCOUNT_JSON)
+ga4-credentials*.json
+*service-account*.json
+*credentials*.json
